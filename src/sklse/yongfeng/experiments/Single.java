@@ -20,54 +20,62 @@ import weka.filters.supervised.instance.SMOTE;
 
 /***
  * <p>Class <b>Single</b> is used to get 10-fold cross validation result of 500 crashes from each project.</p>
- * <p>We use <b>SMOTE</b> strategy combined with other classifiers( including <b>Random forest, C4.5, 
- * Bayesnet, SMO, Kstar, SVM</b> ) to train the model. </p>
- * <p>To better understand the evaluation process, we merge all function into {@link#main(String[])} function.</p>
- *
+ * <p>We use <b>SMOTE</b> strategy combined with other 6 classifiers( including <b>Random forest, J48, 
+ * Bayes Net, SMO, KStar, SVM</b> ) to train the model. 
+ * In {@link#main(String[])} class we provide 2 kinds of method to conduct 10-fold cross-validation in each single project. </p>
+ * <h3><b>(i)</b> Directly get evaluation results from 1 dataset(each project has 1 dataset);</h3> 
+ * <h3><b>(ii)</b> Calculate the average evaluation results from 10 datasets(each project has 10 datasets).</h3>
+ * @version To be uploaded
  */
 public class Single {
 	
+	/** To save all 10 results in one project**/
 	private static double[][] results = new double[60][7];
 	
-	private static String[] classifiers = {"C4.5", "RandForest", "BayesNet", "SMO", "KStar", "SVM"};
+	/** To save all 6 classifiers' name*/
+	private static String[] classifiers = {"C4.5", "RandomForest", "BayesNet", "SMO", "KStar", "SVM"};
+	
+	private static String[] projectNames = {"codec", "ormlite", "jsqlparser", "collections", "io", "jsoup", "mango"};
 
 	public static void main(String[] args) throws Exception {
 		
-		/** We can simply 1 single arff to results in getEvalResult*/
-//		String[] paths = {"files/codec500.arff",
-//				"files/ormlite500.arff", "files/jsqlparser500.arff", "files/collections500.arff",
-//				"files/io500.arff", "files/jsoup500.arff", "files/mango500.arff"};
+		System.out.println("EQ. Results on each single project(average result of 10 dataset of each project).");
+		System.out.println("-------------------------------------------------");
+		System.out.println("1. Experiment setup");
+		System.out.println("   Classifiers      : C4.5, Random Forest, Bayes Net, SMO, KStar, SVM\n");
+		System.out.println("2. Output format");
+		System.out.println("   [classifier] | precision(inTrace) & recall(inTrace) & fmeasure(inTrace) & precision(outTrace) & recall(outTrace) & fmeasure(outTrace) & Accuracy\n");
+		System.out.println("3. Time Consumption");
+		System.out.println("   It will take about 15 minutes to get the final results.");
+		System.out.println("-------------------------------------------------\n");
+		
+		/** (i) Directly get evaluation results from 1 dataset(each project has 1 dataset) */
+//		String[] paths = {"files/generated/codec1.arff",
+//				"files/generated/ormlite1.arff", "files/generated/jsqlparser1.arff", "files/generated/collections1.arff",
+//				"files/generated/io1.arff", "files/generated/jsoup1.arff", "files/generated/mango1.arff"};
 //		for(String path: paths){
-//			getEvalResult(path);
+//			getEvalResult(path, 0);
 //		}
 		
-		/** Or we can use 10 generated arff to get average results in getEvalResult*/
-		String[] pathsCode = FilesSearcher.search("D:/Users/LEE/Desktop/New_Data/", "codec");
-		String[] pathsORM = FilesSearcher.search("D:/Users/LEE/Desktop/New_Data/", "ormlite");
-		String[] pathsJSQ = FilesSearcher.search("D:/Users/LEE/Desktop/New_Data/", "jsqlparser");
-		String[] pathsCOL = FilesSearcher.search("D:/Users/LEE/Desktop/New_Data/", "collections");
-		String[] pathsIO = FilesSearcher.search("D:/Users/LEE/Desktop/New_Data/", "io");
-		String[] pathsJSO = FilesSearcher.search("D:/Users/LEE/Desktop/New_Data/", "jsoup");
-		String[] pathsMAN = FilesSearcher.search("D:/Users/LEE/Desktop/New_Data/", "mango");
+		/** (ii) Calculate the average evaluation results from 10 datasets(each project has 10 datasets)*/
+		/** add all 7 path arrays into the list dataCollection */
+		List<String[]> dataCollection = new ArrayList<>(); 
 		
-		List<String[]> dataCollection = new ArrayList<>();
-		dataCollection.add(pathsCode);
-		dataCollection.add(pathsORM);
-		dataCollection.add(pathsJSQ);
-		dataCollection.add(pathsCOL);
-		dataCollection.add(pathsIO);
-		dataCollection.add(pathsJSO);
-		dataCollection.add(pathsMAN);
+		for(int i=0; i< projectNames.length ;i++){
+			String[] paths = FilesSearcher.search("files/generated/", projectNames[i]);
+			dataCollection.add(paths);
+		}	
 		
-		
-		for(String[] dataset: dataCollection){
+		for(int m=0; m<dataCollection.size(); m++){ // dataCollection.get(m) is dataset array of one project
 			int index = 0;
-			for(String arffs: dataset){
+			for(String arffs: dataCollection.get(m)){ // arff is one dataset of dataset list
 				getEvalResult(arffs, index);
 				index += 6;
 			}
+
+			System.out.println("\nAverage Results of " + projectNames[m] + "\n------------------------\n");
 			
-			for(int j=0; j<6; j++){
+			for(int j=0; j<6; j++){ // for each classifier
 				double p0 = 0.0d, 
 					   p1 = 0.0d, 
 					   r0 = 0.0d, 
@@ -75,7 +83,7 @@ public class Single {
 					   f0 = 0.0d,
 					   f1 = 0.0d,
 					   acc = 0.0d;
-				for(int i=j; i<60; i+=6){	
+				for(int i=j; i<60; i+=6){	// for each time
 					p0 += results[i][0];
 					r0 += results[i][1];
 					f0 += results[i][2];
@@ -84,22 +92,24 @@ public class Single {
 					f1 += results[i][5];
 					acc += results[i][6];
 				}
-				System.out.printf("%-15s: %6.3f, %6.3f, %6.3f, %6.3f, %6.3f, %6.3f, %6.3f\n", 
-						classifiers[j], p0*1.0/10.0, r0*1.0/10.0, f0*1.0/10.0, p1*1.0/10.0, r1*1.0/10.0, f1*1.0/10.0, acc*1.0/10.0);
 				
+				System.out.printf("%-15s : %4.3f & %4.3f & %4.3f & %4.3f & %4.3f & %4.3f & %4.3f \n", 
+						"[" + classifiers[j] + "]", p0*1.0/10.0, r0*1.0/10.0, f0*1.0/10.0, p1*1.0/10.0, r1*1.0/10.0, f1*1.0/10.0, acc*1.0/10.0);
+				//print the average of 10 times
 			}
+			System.out.println("\n");
 		}
 				
 	}
 	
 	/***
 	 * <p>To get 10-fold cross validation in one single arff in <b>path</b></p>
-	 * @param path arff file
+	 * @param path dataset path
 	 * @throws Exception
 	 */
 	public static void getEvalResult(String path, int index) throws Exception{
 		
-//		System.out.println(path);
+		System.out.println("Dealing with [ " + path + " ] ...\n");
 		
 		Instances ins = DataSource.read(path);
 		int numAttr = ins.numAttributes();
@@ -127,16 +137,16 @@ public class Single {
 			fc.setClassifier(cfs[i]);
 			fc.setFilter(smote);
 			
-//			String clfName = cfs[i].getClass().getSimpleName();
-			
 			Evaluation eval = new Evaluation(ins);
 			
 			eval.crossValidateModel(fc, ins, 10, new Random(1));
 			
-//			System.out.printf("%-15s: ", clfName);
+			/**Middle process log starts. Comment it if you don't want to see it.*/
+//			System.out.printf("%-15s: ", classifiers[i]);
 //			System.out.printf(" %4.3f %4.3f %4.3f", eval.precision(0), eval.recall(0), eval.fMeasure(0));
 //			System.out.printf(" %4.3f %4.3f %4.3f", eval.precision(1), eval.recall(1), eval.fMeasure(1));
-//			System.out.printf(" %4.3f \n\n", (1-eval.errorRate()));
+//			System.out.printf(" %4.3f \n", (1-eval.errorRate()));
+			/**Middle process log ends.*/
 			results[index + i][0] = eval.precision(0);
 			results[index + i][1] = eval.recall(0);
 			results[index + i][2] = eval.fMeasure(0);

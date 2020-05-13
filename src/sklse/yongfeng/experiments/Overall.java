@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Random;
 
 import sklse.yongfeng.data.FilesSearcher;
-import sklse.yongfeng.data.InsMerge;
 import weka.classifiers.Classifier;
 import weka.classifiers.bayes.BayesNet;
 import weka.classifiers.evaluation.Evaluation;
@@ -21,47 +20,44 @@ import weka.filters.supervised.instance.SMOTE;
 
 /***
  * <p>Class <b>Overall</b> is used to get 10-fold cross validation result from 3,500 crashes.</p>
- * <p>We use <b>SMOTE</b> strategy combined with other classifiers( including <b>Random forest, C4.5, Bayesnet, SMO, Kstar, SVM</b> ) to train the model.</p>
- *
+ * <p>We use <b>SMOTE</b> strategy combined with other classifiers( including <b>Random forest, C4.5, Bayesnet, SMO, Kstar, SVM</b> ) to train the model. 
  */
 public class Overall {
 	
-	public static double[] results = new double[7];
+	public static double[][] results = new double[60][7];
 	
 	public static List<String[]> datasets = new ArrayList<>();
 	
+	/** To save all 6 classifiers' name*/
+	private static String[] classifiers = {"C4.5", "RandForest", "BayesNet", "SMO", "KStar", "SVM"};
+	
 	public static void main(String[] args) throws Exception {
 		
-//		/** Find the dataset with the same index*/
-//		for(int i=0; i<10; i++){
-//			String[] paths = FilesSearcher.search("D:/Users/LEE/Desktop/New_Data/", (i+1));
-//			datasets.add(paths); 
-//		}	
-//		
-//		/** Merge the dataset with the same index*/
-//		for(String[] data: datasets){  
-//			InsMerge.getIns(data, "D:/Users/LEE/Desktop/New_Data/");
-//		}
-			
-		/** Search for the new-total3500XXX.arff*/
-		String[] paths = FilesSearcher.search("D:/Users/LEE/Desktop/New_Data/", "new-total");
+		System.out.println("EQ. Results on total dataset (average result of 10 total dataset).");
+		System.out.println("-------------------------------------------------");
+		System.out.println("1. Experiment setup");
+		System.out.println("   Classifiers      : C4.5, Random Forest, Bayes Net, SMO, KStar, SVM\n");
+		System.out.println("2. Output format");
+		System.out.println("   [classifier] | precision(inTrace) & recall(inTrace) & fmeasure(inTrace) & precision(outTrace) & recall(outTrace) & fmeasure(outTrace) & Accuracy\n");
+		System.out.println("3. Time Consumption");
+		System.out.println("   It will take about 30 minutes to get the final results.");
 
-		/** Get Result*/
-		for(String path: paths){
-			getEvalResult(path);
-		}
+		System.out.println("-------------------------------------------------\n");
+		
+		/** Get average results from 10 datasets (each of which has 3500 crashes).*/			
+		getEvalResultByAve("files/total/");
 
 	}
 	
 	/***
-	 * <p>To get 10-fold cross validation in one single arff in <b>path</b></p>
+	 * <p>To get 10-fold cross validation of dataset(arff file) in <b>path</b>.</p>
 	 * @param path arff file
 	 * @throws Exception
 	 */
-	public static void getEvalResult(String path) throws Exception{
+	public static void getEvalResult(String path, int index) throws Exception{
 		
-//		System.out.println(path);
-		
+		System.out.println("Dealing with [ " + path + " ] ...\n");
+				
 		Instances ins = DataSource.read(path);
 		int numAttr = ins.numAttributes();
 		ins.setClassIndex(numAttr - 1);
@@ -79,7 +75,7 @@ public class Overall {
 		
 		FilteredClassifier fc = new FilteredClassifier();
 
-		Classifier[] cfs = {j48, rf, bn, smo, ks, svm};	
+		Classifier[] cfs = {j48, rf, bn, smo, ks, svm};		
 		
 		/**No Format*/
 		for(int i=0;i<cfs.length;i++){
@@ -88,23 +84,22 @@ public class Overall {
 			fc.setClassifier(cfs[i]);
 			fc.setFilter(smote);
 			
-//			String clfName = cfs[i].getClass().getSimpleName();
-			
 			Evaluation eval = new Evaluation(ins);
 			
 			eval.crossValidateModel(fc, ins, 10, new Random(1));
 			
-			System.out.printf("%-15s: ", cfs[i].toString());
-			System.out.printf(" %4.3f %4.3f %4.3f", eval.precision(0), eval.recall(0), eval.fMeasure(0));
-			System.out.printf(" %4.3f %4.3f %4.3f", eval.precision(1), eval.recall(1), eval.fMeasure(1));
-			System.out.printf(" %4.3f \n\n", (1-eval.errorRate()));
-//			results[0] = eval.precision(0);
-//			results[1] = eval.recall(0);
-//			results[2] = eval.fMeasure(0);
-//			results[3] = eval.precision(1);
-//			results[4] = eval.recall(1);
-//			results[5] = eval.fMeasure(1);
-//			results[6] = 1-eval.errorRate();
+//			System.out.println("--------------");
+//			System.out.printf("%-15s: ", classifiers[i]);
+//			System.out.printf(" %4.3f %4.3f %4.3f", eval.precision(0), eval.recall(0), eval.fMeasure(0));
+//			System.out.printf(" %4.3f %4.3f %4.3f", eval.precision(1), eval.recall(1), eval.fMeasure(1));
+//			System.out.printf(" %4.3f \n\n", (1-eval.errorRate()));
+			results[index + i][0] = eval.precision(0);
+			results[index + i][1] = eval.recall(0);
+			results[index + i][2] = eval.fMeasure(0);
+			results[index + i][3] = eval.precision(1);
+			results[index + i][4] = eval.recall(1);
+			results[index + i][5] = eval.fMeasure(1);
+			results[index + i][6] = 1-eval.errorRate();
 			
 		}
 		
@@ -150,6 +145,45 @@ public class Overall {
 //		}
 //		System.out.println("");
 		
+	}
+	
+	/***
+	 * <p>To get average results of 10 datasets using 6 classifers</p>
+	 * <p>Specifically, we first generate 10 matrices (6*7) to record the 10-fold cross validation results.
+	 *  Then construct one total matrix (6*10*7) by combining above 10 matrices.</p>
+	 * @param folder
+	 * @throws Exception
+	 */
+	public static void getEvalResultByAve(String folder) throws Exception{
+		String[] paths = FilesSearcher.search(folder, "total"); // Search for the total3500XXX.arff in files/total/
+		
+		for(int i=0; i<paths.length; i++){ // for each dataset, get evaluation results
+			getEvalResult(paths[i], 6*i);
+		}
+		
+		for(int j=0; j<6; j++){
+			double p0 = 0.0d, 
+					   p1 = 0.0d, 
+					   r0 = 0.0d, 
+					   r1 = 0.0d,
+					   f0 = 0.0d,
+					   f1 = 0.0d,
+					   acc = 0.0d;
+				for(int i=j; i<60; i+=6){	// for each time
+					p0 += results[i][0];
+					r0 += results[i][1];
+					f0 += results[i][2];
+					p1 += results[i][3];
+					r1 += results[i][4];
+					f1 += results[i][5];
+					acc += results[i][6];
+				}
+				
+				//print the average of 10 times
+				System.out.printf("%-15s: %6.3f, %6.3f, %6.3f, %6.3f, %6.3f, %6.3f, %6.3f\n", 
+						"[" + classifiers[j] + "]", p0*1.0/10.0, r0*1.0/10.0, f0*1.0/10.0, p1*1.0/10.0, r1*1.0/10.0, f1*1.0/10.0, acc*1.0/10.0);
+				
+		}
 	}
 
 }
